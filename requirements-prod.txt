@@ -1,0 +1,19 @@
+# Production dependencies — Solar Flare Database API + Spyder
+mysql-connector-python>=9.0
+fastapi>=0.136
+uvicorn>=0.48
+requests>=2.33
+beautifulsoup4>=4.14
+pysolar>=0.13
+python-dateutil>=2.9
+python-dotenv>=1.2
+netCDF4>=1.7
+numpy>=2.4
+pandas>=3.0
+pytz>=2026
+certifi>=2026
+charset-normalizer>=3.4
+idna>=3.13
+soupsieve>=2.8
+urllib3>=2.7
+cftime>=1.6

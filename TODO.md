@@ -1,5 +1,7 @@
 # Implementation Plan — Unified Solar Flare Database Service
 
+> **Status: All phases complete** (2026-05-30)
+
 ## Target architecture
 
 ```
@@ -25,15 +27,13 @@
 
 ---
 
-## Phase 1 — Unified database schema
+## Phase 1 — Unified database schema [x]
 
-**Goal:** One table that holds the historical catalog AND receives live updates from the spyder.
+- [x] Design `flares` table with all meaningful columns from both systems
+- [x] Write `db/schema.sql` (CREATE TABLE + indexes)
+- [x] Write `db/migrate.sql` (INSERT the single existing `observations` row into new table, then DROP `observations`)
 
-- [ ] Design `flares` table with all meaningful columns from both systems
-- [ ] Write `db/schema.sql` (CREATE TABLE + indexes)
-- [ ] Write `db/migrate.sql` (INSERT the single existing `observations` row into new table, then DROP `observations`)
-
-### Proposed schema
+### Schema delivered
 
 | Column | Type | Source |
 |---|---|---|
@@ -51,96 +51,51 @@
 | `metadata` | JSON | new — extensible bag for future per-flare attributes |
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | both |
 
-Index: UNIQUE on `(event_start, instrument)` for dedup.
+Unique key: `(event_start, instrument)` for dedup.
 
-### Extensibility strategy
-
-**Per-flare attributes** (e.g. active region magnetic class, GOES XRS-A channel flux if NOAA adds it): store in the `metadata` JSON column. No schema migration needed. The API can filter on JSON paths (`metadata->>"$.sunspot_group"`) with a generated column + index if a field becomes heavily queried.
-
-**External time-series indices** (sunspot number, F10.7 solar radio flux, geomagnetic Kp/Ap): these are *daily* values, not per-flare. They belong in a separate table to avoid denormalization:
-
-| Column | Type |
-|---|---|
-| `date` | DATE NOT NULL PK |
-| `sunspot_number` | INT | (SILSO/ISN v2) |
-| `f10_7_flux` | DOUBLE | (solar radio flux at 10.7 cm, sfu) |
-| `kp_index` | DOUBLE | (planetary geomagnetic) |
-| `ap_index` | INT |
-| `source` | VARCHAR(50) | (SILSO, NOAA SWPC, etc.) |
-| `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP |
-
-Join on `DATE(flares.event_start) = solar_indices.date`.
-- [ ] Write `solar_indices` table into `db/schema.sql`
+- [x] Write `solar_indices` table into `db/schema.sql`
 
 ---
 
-## Phase 2 — Historical data import
+## Phase 2 — Historical data import [x]
 
-**Goal:** Load all 93K flares from the notebook pipeline into the new `flares` table.
-
-- [ ] Extract the core logic from `netcdf_export.ipynb` into `db/historical_load.py`
-  - Download GOES-16 + GOES-19 netCDFs (skip if already in `data/` and recent)
-  - Load + correct SWPC catalog (/ 0.7)
-  - `combine_flares()` for both GOES satellites
-  - Merge, trim overlaps, insert into MySQL with dedup
-- [ ] Run once to populate the database
-- [ ] Verify: query total rows, date range, check no duplicates
+- [x] Extract the core logic from `netcdf_export.ipynb` into `db/historical_load.py`
+- [x] Run once to populate the database — **92,670 flares loaded**
+- [x] Verify: query total rows, date range, check no duplicates
 
 ---
 
-## Phase 3 — Refactor the spyder (real-time updater)
+## Phase 3 — Refactor the spyder (real-time updater) [x]
 
-**Goal:** Replace the current `spyder.py` + `runScript.sh` with a cleaner version that feeds the new `flares` table.
-
-- [ ] Create `spyder/realtime.py`:
-  - Parse `xray-flares-latest.json` (keep Vidal's BeautifulSoup logic)
-  - Map JSON fields to the unified schema
-  - Dedup by `(event_start, instrument)` → INSERT if new
-  - Log activity
-- [ ] Create `spyder/netcdf_sync.py`:
-  - Download latest GOES-19 netCDF from NOAA (scrape directory)
-  - Load with `nc_to_pandas()`, run `combine_flares()`
-  - INSERT new flares only (WHERE NOT EXISTS by event_start)
-  - This catches any flares missed by the JSON poller
-- [ ] Systemd timer or crontab:
-  - `realtime.py` every 300s (5 min)
-  - `netcdf_sync.py` daily at 02:00
+- [x] Create `spyder/realtime.py` — JSON poller, handles malformed NOAA JSON + in-progress flares
+- [x] Create `spyder/netcdf_sync.py` — daily GOES-19 netCDF batch sync, skips if unchanged
+- [x] Schedule: `crontab.example` — realtime every 5 min, netcdf sync daily at 02:00
 
 ---
 
-## Phase 4 — REST API
+## Phase 4 — REST API [x]
 
-**Goal:** Expose the database via HTTP for external consumers.
-
-- [ ] Create `api/app.py` using FastAPI:
-  - `GET /flares` — paginated, filter by date range, class, source, instrument
-  - `GET /flares/latest` — most recent flare
-  - `GET /flares/{id}` — single flare by ID
-  - `GET /stats` — counts by class, year, instrument
-  - `GET /indices` — daily solar indices, filterable by date range
-  - `GET /flares?with_indices=true` — join flares with their day's solar indices
-- [ ] Add CORS middleware
-- [ ] Add OpenAPI auto-docs at `/docs`
-- [ ] Add `api/indices_importer.py` — script to fetch and import sunspot/F10.7/Kp data from public sources (SILSO, NOAA SWPC)
+- [x] Create `api/app.py` using FastAPI with all endpoints
+- [x] Add CORS middleware
+- [x] Add OpenAPI auto-docs at `/docs`
+- [x] Add `api/indices_importer.py` — SILSO sunspot (72K rows), NOAA F10.7 (30d), NOAA Kp/Ap
 
 ---
 
-## Phase 5 — Containerization
+## Phase 5 — Containerization [x]
 
-**Goal:** Reproducible deployment with Docker.
-
-- [ ] Create `Dockerfile` for the Python app
-- [ ] Create `docker-compose.yml`:
-  - MySQL 8 service (with persistent volume)
-  - Python app service (API + spyder loop)
-  - Optional: Adminer for DB inspection
-- [ ] Environment variables via `.env` (already exists)
+- [x] Create `Dockerfile` for the Python app
+- [x] Create `docker-compose.yml` (MySQL 8 + API + spyder + optional Adminer)
+- [x] `.env.docker` for Docker networking (HOST=db)
 
 ---
 
-## Phase 6 — Cleanup & docs
+## Phase 6 — Cleanup & docs [x]
 
-- [ ] Update `README.md` with architecture diagram and usage
-- [ ] Remove `main.py` (PyCharm template)
-- [ ] Archive or remove old `spyder.py` after migration confirmed
-- [ ] Add `data/` to `.gitignore` (netCDF files are large downloads)
+- [x] Update `README.md` with architecture diagram and usage
+- [x] Remove `main.py` (PyCharm template)
+- [x] Archive old `spyder.py`, `runScript.sh`, `createDB.txt` → `legacy/`
+- [x] Add `data/` to `.gitignore`
+- [x] Untrack `logs.log`
+- [x] Remove `.ipynb_checkpoints`
+- [x] Add `.env.example` template
