@@ -235,6 +235,8 @@ def load_swpc_catalog() -> pd.DataFrame:
         magnitudes.append(f"{cat}{sub}")
     df["magnitude"] = magnitudes
 
+    df["instrument"] = df["instrument"].str.strip()
+
     df["source"] = "SWPC"
     df["integrated_flux"] = None  # not available for SWPC
 

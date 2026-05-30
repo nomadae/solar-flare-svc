@@ -1,0 +1,21 @@
+# Solar Flare Spyder — crontab entries
+#
+# Install with:  crontab crontab.example
+# Edit with:     crontab -e
+# List with:     crontab -l
+#
+# Replace /home/nomad/git/Spyder-SolarData-GICC with your actual project path.
+
+# --- Realtime poller: every 5 minutes ---
+# Fetches the latest GOES flare from NOAA's JSON endpoint.
+# Only inserts if the flare is complete and not already in the DB.
+*/5 * * * * /home/nomad/git/Spyder-SolarData-GICC/venv/bin/python /home/nomad/git/Spyder-SolarData-GICC/spyder/realtime.py >> /home/nomad/git/Spyder-SolarData-GICC/logs.log 2>&1
+
+# --- Daily netCDF sync: 02:00 ---
+# Downloads the latest GOES-19 netCDF and inserts any new flares.
+# The file is only re-downloaded when NOAA publishes an update.
+0 2 * * * /home/nomad/git/Spyder-SolarData-GICC/venv/bin/python /home/nomad/git/Spyder-SolarData-GICC/spyder/netcdf_sync.py >> /home/nomad/git/Spyder-SolarData-GICC/logs.log 2>&1
+
+# --- Daily solar indices refresh: 03:00 ---
+# Updates sunspot number (SILSO), F10.7 flux, and Kp/Ap indices.
+0 3 * * * /home/nomad/git/Spyder-SolarData-GICC/venv/bin/python /home/nomad/git/Spyder-SolarData-GICC/api/indices_importer.py >> /home/nomad/git/Spyder-SolarData-GICC/logs.log 2>&1
