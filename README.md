@@ -1,6 +1,6 @@
-# Spyder-SolarData-GICC
+# Solar Flare Service
 
-Unified GOES X-ray flare catalog with a live spyder for real-time updates.
+Unified GOES X-ray flare catalog with a live spyder for real-time updates. Exposes a FastAPI service to fetch information about solar flares and other solar indices.
 
 - 92,670 solar flare events spanning 1975–present
 - REST API with pagination, filtering, and Swagger docs
